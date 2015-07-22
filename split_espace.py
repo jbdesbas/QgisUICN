@@ -9,7 +9,6 @@ espaces=['espace_point','espace_polygon','espace_line','espace_commune'] #liste 
 
 path=QFileDialog.getExistingDirectory()
 #path=('/home/jb/Code/python/UICN/')
-
 #layer = QgsVectorLayer(str(filename),"Input","ogr")
 
 for espace in espaces:
