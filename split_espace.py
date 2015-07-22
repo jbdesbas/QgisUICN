@@ -60,7 +60,7 @@ for espace in espaces:
             
             layer2.commitChanges()
             
-            #Ecriture des layer sur le disque
+            #Ecriture des layers sur le disque
             if not os.path.exists(path+'/'+nom_s):
                 os.makedirs(path+'/'+nom_s)
             QgsVectorFileWriter.writeAsVectorFormat(layer2,'%s/%s/%s_%s.shp' % (path,nom_s,geomType,nom_s),u'System',layer2.dataProvider().crs())
