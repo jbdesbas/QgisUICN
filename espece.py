@@ -5,15 +5,13 @@ import os
 
 canvas = iface.mapCanvas()
 
-#ajouter une colone annee
-
 #path=QFileDialog.getExistingDirectory()
 path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Orthopteres/Gomphocerippus rufus'
 
 listdir=os.listdir(path)
 shapes=[]
 for file in listdir:
-    if file.endswith('.shp'):
+    if file.endswith('.shp') and file!=('MCP.shp') and file!=('MCPfinal.shp'):
         shapes.append(file)
 
 years_colors=(
@@ -58,6 +56,7 @@ for shape in shapes:
         layer.changeAttributeValue(f.id(),field_index,value)
     
     layer.commitChanges()
+    
     QgsMapLayerRegistry.instance().addMapLayers([layer])
  
     symbol = QgsSymbolV2.defaultSymbol(layer.geometryType())
@@ -104,6 +103,77 @@ for shape in shapes:
         
         layer.setSubsetString('"annee"=%i and "nb">=0'%(year))
 
-        processing.runalg("qgis:convexhull",layer,'',0,pathMCP+"/"+str(year)+"/"+geomType+".shp")
+        processing.runalg("qgis:convexhull",layer,'',0,pathMCP+"/"+str(year)+"/"+geomType+".shp")#il aurait ete possible dutiliser un outil integre
         
     layer.setSubsetString('')
+
+#for element in os.listdir(pathMCP): #plus simple avec os.walk ?
+#    element=pathMCP+"/"+element
+#    if(os.path.isdir(element)):
+#        for shp in os.listdir(element):
+#            if shp.endswith('.shp'):
+#                print element+"/"+shp
+                
+shps=[]
+first=True
+
+for annee in os.listdir(pathMCP):
+    annee2=int(annee)
+    annee=pathMCP+"/"+annee
+    if(os.path.isdir(annee)):
+        for file in os.listdir(annee):
+            file=annee+"/"+file
+            if file.endswith('.shp'):
+                layer=QgsVectorLayer(file,'toto',"ogr")
+                print file
+                layer.startEditing()
+                layer.dataProvider().addAttributes([QgsField('annee', QVariant.Int)])
+                layer.updateFields()
+                field_index=layer.fieldNameIndex('annee')
+                for f in layer.getFeatures():
+                    #layer.updateFeature(f)
+                    layer.changeAttributeValue(f.id(),field_index,annee2) 
+                layer.commitChanges()
+                #layer.dataProvider.updateExtents()
+                layer=QgsVectorLayer(file,'toto',"ogr") #Faut rechercher le layer sinon ca marche pas je sais pas pquoi et ca m enerve
+
+                if first: #Cloner le layer precend et le vider
+                    QgsVectorFileWriter.writeAsVectorFormat(layer,path+"/MCP.shp",u'System',layer.dataProvider().crs())
+                    layerMCP=QgsVectorLayer(path+"/MCP.shp","MCP","ogr")
+                    layerMCP.startEditing()
+                    for f in layerMCP.getFeatures():
+                        layerMCP.deleteFeature(f.id())
+                    layerMCP.commitChanges()
+                    first=False 
+                    
+                layerMCP.startEditing()
+                for f in layer.getFeatures():
+                    layerMCP.addFeature(f)
+                layerMCP.commitChanges()
+                
+                #Reste plus que a grouper les geometrie avec la meme annee
+#Copie du layer MCP et vidange
+QgsVectorFileWriter.writeAsVectorFormat(layer,path+"/MCPfinal.shp",u'System',layer.dataProvider().crs())
+layerMCPfinal=QgsVectorLayer(path+"/MCPfinal.shp","MCPfinal","ogr")
+layerMCPfinal.startEditing()
+for f in layerMCPfinal.getFeatures():
+    layerMCPfinal.deleteFeature(f.id())
+layerMCPfinal.commitChanges()
+layerMCPfinal.startEditing()
+for anneeMCP in layerMCP.uniqueValues(layerMCP.fieldNameIndex('annee')):
+    geom=QgsGeometry()
+    for f in layerMCP.getFeatures(QgsFeatureRequest(QgsExpression('"annee"='+str(anneeMCP)))):
+        if geom.area()<0: #Si encore invalid (premiere passe)
+            geom=QgsGeometry(f.geometry())
+            print str(anneeMCP)
+            
+        geom=QgsGeometry(f.geometry().combine(geom))
+        newFeature=QgsFeature(f) #copie
+    newFeature.setGeometry(geom)
+    
+    layerMCPfinal.addFeature(newFeature)
+layerMCPfinal.commitChanges()
+#Faire la mise a jour des area et perimeter
+#Ce n est pas encore un vrai bon MCP il faut autiliser QgsGeometry::convexHull et mettre a jour la geom
+#Recharger ?
+QgsMapLayerRegistry.instance().addMapLayers([layerMCPfinal])
