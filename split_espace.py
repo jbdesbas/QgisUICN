@@ -16,7 +16,7 @@ for espace in espaces:
     layer = QgsVectorLayer(path+'/'+espace+'.shp',"Input","ogr")
 
     if not layer.isValid():
-        print "Erreur input"
+        print "Erreur input "+espace
         continue
     else:
         field_index = layer.fieldNameIndex('id_esp')
@@ -46,7 +46,7 @@ for espace in espaces:
                 geomType='Polygon' 
                        
             layer2=QgsVectorLayer(geomType+"?crs=EPSG:2154",nom_s, "memory") #nouveau layer vide  
-
+            #Peut mieux faire avec layer.setSubsetString 
             layer2.startEditing()
             for field in layer.dataProvider().fields(): #on boucle pour creer chaque champs a partir du layer en input
                 layer2.addAttribute(field)
