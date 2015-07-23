@@ -5,6 +5,8 @@ import os
 
 canvas = iface.mapCanvas()
 
+#ajouter une colone annee
+
 #path=QFileDialog.getExistingDirectory()
 path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Orthopteres/Gomphocerippus rufus'
 
@@ -30,7 +32,11 @@ years_colors=(
 )
 
 for shape in shapes:
+  
+       
     layer=QgsVectorLayer(path+'/'+shape,"Temp","ogr")
+   
+        
     if layer.geometryType()==0: #Point
         geomType='Point'
     elif layer.geometryType()==1: #Ligne
@@ -39,6 +45,19 @@ for shape in shapes:
         geomType='Polygon' 
     layer.setDataSource(path+'/'+shape,geomType,"ogr")
     
+    field_index=layer.fieldNameIndex('annee')
+    if field_index==-1: #La colone existe pas deja
+        layer.startEditing()
+        layer.dataProvider().addAttributes([QgsField('annee', QVariant.Int)])
+        layer.updateFields()
+        layer.commitChanges()
+    field_index=layer.fieldNameIndex('annee') 
+    layer.startEditing()
+    for f in layer.getFeatures():
+        value=QgsExpression('year("date_obs")').evaluate(f)
+        layer.changeAttributeValue(f.id(),field_index,value)
+    
+    layer.commitChanges()
     QgsMapLayerRegistry.instance().addMapLayers([layer])
  
     symbol = QgsSymbolV2.defaultSymbol(layer.geometryType())
@@ -64,32 +83,27 @@ for shape in shapes:
     root_rule.appendChild(rule)
 
     for year,color in years_colors: #2004 a 2015
-        rPass+=1 #Les donnes les plus recentes dessu
+        rPass+=1 #Les donnes les plus recentes dessus
         rule = root_rule.children()[0].clone()
         rule.setLabel(str(year))
         rule.setFilterExpression('year("date_obs")=%i AND "nb">=0'%(year))
-        
         rule.symbol().setColor(QColor(color))
         rule.symbol().symbolLayer(0).setRenderingPass(rPass)
         root_rule.appendChild(rule)
-
-   
         
     root_rule.removeChildAt(0)
-    # apply the renderer to the layer
-    layer.setRendererV2(renderer)
+    layer.setRendererV2(renderer) # apply the renderer to the layer
 
     
     #MCP
-    if not os.path.exists(path+'/MCP'):
-        os.makedirs(path+'/MCP')
-    for year,color in years_colors:
+    pathMCP=path+'/MCP'
+   
+    for year,NULL in years_colors:
+        if not os.path.exists(pathMCP+'/'+str(year)):
+            os.makedirs(pathMCP+'/'+str(year))
         
-        features=layer.getFeatures(QgsFeatureRequest(QgsExpression('"nb">=0 AND year("date_obs")=%i' %(year))))
+        layer.setSubsetString('"annee"=%i and "nb">=0'%(year))
 
-        layer.setSubsetString('year("date_obs")=%i'%(year))
-
-        
-        processing.runalg("qgis:convexhull",layer,'',0,path+"/MCP/"+str(year)+".shp")
+        processing.runalg("qgis:convexhull",layer,'',0,pathMCP+"/"+str(year)+"/"+geomType+".shp")
         
     layer.setSubsetString('')
