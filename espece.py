@@ -4,16 +4,6 @@ import processing
 import os
 
 canvas = iface.mapCanvas()
-
-#path=QFileDialog.getExistingDirectory()
-path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Orthopteres/Gomphocerippus rufus'
-
-listdir=os.listdir(path)
-shapes=[]
-for file in listdir:
-    if file.endswith('.shp') and file!=('MCP.shp') and file!=('MCPfinal.shp'):
-        shapes.append(file)
-
 years_colors=(
     (2004,'#d7191c'),
     (2005,'#e44f35'),
@@ -29,20 +19,27 @@ years_colors=(
     (2015,'#1a9641'),
 )
 
-for shape in shapes:
-  
-       
+#path=QFileDialog.getExistingDirectory()
+path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Orthopteres/Gomphocerippus rufus'
+
+listdir=os.listdir(path)
+shapes=[]
+for file in listdir:
+    if file.endswith('.shp') and file!=('MCP.shp') and file!=('MCPfinal.shp'):
+        shapes.append(file)
+
+for shape in shapes: #Pour chaque fichier shape retenu
     layer=QgsVectorLayer(path+'/'+shape,"Temp","ogr")
-   
-        
+ 
     if layer.geometryType()==0: #Point
         geomType='Point'
     elif layer.geometryType()==1: #Ligne
         geomType='linestring'
     elif layer.geometryType()==2: #Polygon
         geomType='Polygon' 
-    layer.setDataSource(path+'/'+shape,geomType,"ogr")
+    layer.setDataSource(path+'/'+shape,geomType,"ogr") #Changer le nom du layer
     
+    #ajouter une colonne annee (pour le subset)
     field_index=layer.fieldNameIndex('annee')
     if field_index==-1: #La colone existe pas deja
         layer.startEditing()
@@ -54,15 +51,14 @@ for shape in shapes:
     for f in layer.getFeatures():
         value=QgsExpression('year("date_obs")').evaluate(f)
         layer.changeAttributeValue(f.id(),field_index,value)
-    
     layer.commitChanges()
     
-    QgsMapLayerRegistry.instance().addMapLayers([layer])
+    QgsMapLayerRegistry.instance().addMapLayers([layer]) #ajouter la couche
  
+    #Symbologie des donnes espece
     symbol = QgsSymbolV2.defaultSymbol(layer.geometryType())
     renderer=QgsRuleBasedRendererV2(symbol)
     root_rule = renderer.rootRule()
-    
     rPass=10
     if geomType=='Point': #Carre blanc pour les prospe negative
         rule = root_rule.children()[0].clone()
@@ -72,7 +68,6 @@ for shape in shapes:
         rule.symbol().setColor(QColor('white'))
         rule.symbol().symbolLayer(0).setRenderingPass(rPass)
         root_rule.appendChild(rule)
-    
     rPass=15
     rule = root_rule.children()[0].clone() #Donnes historiques
     rule.setLabel('<2004')
@@ -80,7 +75,7 @@ for shape in shapes:
     rule.symbol().setColor(QColor('#5f5e5e'))
     rule.symbol().symbolLayer(0).setRenderingPass(rPass)
     root_rule.appendChild(rule)
-
+    
     for year,color in years_colors: #2004 a 2015
         rPass+=1 #Les donnes les plus recentes dessus
         rule = root_rule.children()[0].clone()
@@ -91,53 +86,40 @@ for shape in shapes:
         root_rule.appendChild(rule)
         
     root_rule.removeChildAt(0)
-    layer.setRendererV2(renderer) # apply the renderer to the layer
+    layer.setRendererV2(renderer) # Appliquer la symbologie
 
-    
     #MCP
     pathMCP=path+'/MCP'
-   
     for year,NULL in years_colors:
         if not os.path.exists(pathMCP+'/'+str(year)):
             os.makedirs(pathMCP+'/'+str(year))
-        
         layer.setSubsetString('"annee"=%i and "nb">=0'%(year))
-
-        processing.runalg("qgis:convexhull",layer,'',0,pathMCP+"/"+str(year)+"/"+geomType+".shp")#il aurait ete possible dutiliser un outil integre
-        
+        processing.runalg("qgis:convexhull",layer,'',0,pathMCP+"/"+str(year)+"/"+geomType+".shp")#il aurait ete possible dutiliser un outil integre 
     layer.setSubsetString('')
 
-#for element in os.listdir(pathMCP): #plus simple avec os.walk ?
-#    element=pathMCP+"/"+element
-#    if(os.path.isdir(element)):
-#        for shp in os.listdir(element):
-#            if shp.endswith('.shp'):
-#                print element+"/"+shp
-                
+
+#Traitement des MCP
 shps=[]
 first=True
-
-for annee in os.listdir(pathMCP):
+for annee in os.listdir(pathMCP): #pour chaque dossier annee
     annee2=int(annee)
     annee=pathMCP+"/"+annee
-    if(os.path.isdir(annee)):
+    if(os.path.isdir(annee)): #S assurer que c est bien un dossier
         for file in os.listdir(annee):
             file=annee+"/"+file
-            if file.endswith('.shp'):
+            if file.endswith('.shp'): #Ne prendre que les shape
                 layer=QgsVectorLayer(file,'toto',"ogr")
                 print file
                 layer.startEditing()
-                layer.dataProvider().addAttributes([QgsField('annee', QVariant.Int)])
+                layer.dataProvider().addAttributes([QgsField('annee', QVariant.Int)]) #ajouter un champs annee
                 layer.updateFields()
                 field_index=layer.fieldNameIndex('annee')
                 for f in layer.getFeatures():
-                    #layer.updateFeature(f)
-                    layer.changeAttributeValue(f.id(),field_index,annee2) 
+                    layer.changeAttributeValue(f.id(),field_index,annee2) #inserer dans le champs annee (pris depuis le nom du dossier) j aurai du le faire dans l etape anvant
                 layer.commitChanges()
-                #layer.dataProvider.updateExtents()
-                layer=QgsVectorLayer(file,'toto',"ogr") #Faut rechercher le layer sinon ca marche pas je sais pas pquoi et ca m enerve
+                layer=QgsVectorLayer(file,'toto',"ogr") #Faut recharger le layer sinon ca marche pas je sais pas pquoi et ca m enerve
 
-                if first: #Cloner le layer precend et le vider
+                if first: #Cloner le layer precend et le vider a la premiere passe
                     QgsVectorFileWriter.writeAsVectorFormat(layer,path+"/MCP.shp",u'System',layer.dataProvider().crs())
                     layerMCP=QgsVectorLayer(path+"/MCP.shp","MCP","ogr")
                     layerMCP.startEditing()
@@ -146,12 +128,12 @@ for annee in os.listdir(pathMCP):
                     layerMCP.commitChanges()
                     first=False 
                     
-                layerMCP.startEditing()
+                layerMCP.startEditing() #ajouter le contenu du layer MCP dans celui qui va tous les regrouper
                 for f in layer.getFeatures():
                     layerMCP.addFeature(f)
                 layerMCP.commitChanges()
                 
-                #Reste plus que a grouper les geometrie avec la meme annee
+#Dans cette partie, il faut juster combiner les MCP de la meme annee qui sont dans la couche MCP.shp
 #Copie du layer MCP et vidange
 QgsVectorFileWriter.writeAsVectorFormat(layer,path+"/MCPfinal.shp",u'System',layer.dataProvider().crs())
 layerMCPfinal=QgsVectorLayer(path+"/MCPfinal.shp","MCPfinal","ogr")
@@ -165,16 +147,16 @@ for anneeMCP in layerMCP.uniqueValues(layerMCP.fieldNameIndex('annee')):
     for f in layerMCP.getFeatures(QgsFeatureRequest(QgsExpression('"annee"='+str(anneeMCP)))):
         if geom.area()<0: #Si encore invalid (premiere passe)
             geom=QgsGeometry(f.geometry())
-            print str(anneeMCP)
-            
-        geom=QgsGeometry(f.geometry().combine(geom))
+            print str(anneeMCP)  
+        geom=QgsGeometry(f.geometry().combine(geom)) #Union de la geom precedente avec la nouvelle
         newFeature=QgsFeature(f) #copie
-    newFeature.setGeometry(geom)
-    
-    layerMCPfinal.addFeature(newFeature)
-layerMCPfinal.commitChanges()
-#Faire la mise a jour des area et perimeter
-#Ce n est pas encore un vrai bon MCP il faut autiliser QgsGeometry::convexHull et mettre a jour la geom
+    newFeature.setGeometry(geom) 
+    layerMCPfinal.addFeature(newFeature)#et on integre le MCP de cette anne dans le MCPfinal
+layerMCPfinal.commitChanges()# toutes les annees sont traitees commit
+
+#Ici il faudrait refaire un mcp a partir de l union des MCP, utiliser QgsGeometry::convexHull et mettre a jour la geom
+
+#Mise a jour du champs area, et suppression des champs parasites
 layerMCPfinal.startEditing()
 for f in layerMCPfinal.getFeatures():
     field_index=layerMCPfinal.fieldNameIndex('area')
@@ -190,9 +172,9 @@ field_index=layerMCPfinal.fieldNameIndex('value')
 layerMCPfinal.deleteAttribute(field_index)
 layerMCPfinal.updateFields()
 layerMCPfinal.commitChanges()
-layerMCPfinal=QgsVectorLayer(path+"/MCPfinal.shp","MCPfinal","ogr")#Recharger ?
 
-QgsMapLayerRegistry.instance().addMapLayers([layerMCPfinal])
+
+QgsMapLayerRegistry.instance().addMapLayers([layerMCPfinal]) #Ajout a la carte
 
 #Symbologie des MCP
 rpass=0
