@@ -175,5 +175,39 @@ for anneeMCP in layerMCP.uniqueValues(layerMCP.fieldNameIndex('annee')):
 layerMCPfinal.commitChanges()
 #Faire la mise a jour des area et perimeter
 #Ce n est pas encore un vrai bon MCP il faut autiliser QgsGeometry::convexHull et mettre a jour la geom
-#Recharger ?
+layerMCPfinal.startEditing()
+for f in layerMCPfinal.getFeatures():
+    field_index=layerMCPfinal.fieldNameIndex('area')
+    value=QgsExpression(' $area /1000000').evaluate(f)
+    layerMCPfinal.changeAttributeValue(f.id(),field_index,value)
+layerMCPfinal.commitChanges()
+layerMCPfinal.startEditing()
+field_index=layerMCPfinal.fieldNameIndex('perim')
+layerMCPfinal.deleteAttribute(field_index)
+field_index=layerMCPfinal.fieldNameIndex('id')
+layerMCPfinal.deleteAttribute(field_index)
+field_index=layerMCPfinal.fieldNameIndex('value')
+layerMCPfinal.deleteAttribute(field_index)
+layerMCPfinal.updateFields()
+layerMCPfinal.commitChanges()
+layerMCPfinal=QgsVectorLayer(path+"/MCPfinal.shp","MCPfinal","ogr")#Recharger ?
+
 QgsMapLayerRegistry.instance().addMapLayers([layerMCPfinal])
+
+#Symbologie des MCP
+rpass=0
+symbol = QgsSymbolV2.defaultSymbol(layer.geometryType())
+renderer=QgsRuleBasedRendererV2(symbol)
+root_rule = renderer.rootRule()
+for year,color in years_colors: #2004 a 2015
+        rPass+=1 #Les donnes les plus recentes dessus
+        rule = root_rule.children()[0].clone()
+        rule.setLabel(str(year))
+        rule.setFilterExpression('"annee"=%i'%(year))
+        rule.symbol().setColor(QColor(color))
+        rule.symbol().symbolLayer(0).setRenderingPass(rPass)
+        rule.symbol().setAlpha(0.3)
+        root_rule.appendChild(rule)
+        
+root_rule.removeChildAt(0)
+layerMCPfinal.setRendererV2(renderer) # apply the renderer to the layer
