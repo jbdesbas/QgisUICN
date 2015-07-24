@@ -21,6 +21,7 @@ years_colors=(
 
 #path=QFileDialog.getExistingDirectory()
 path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Orthopteres/Gomphocerippus rufus'
+grille=QgsVectorLayer('/home/users/jbdesbas/Documents/Listes rouges/Evaluation/grilles/2km_Picardie.shp','grille','ogr')
 
 listdir=os.listdir(path)
 shapes=[]
@@ -96,8 +97,34 @@ for shape in shapes: #Pour chaque fichier shape retenu
         layer.setSubsetString('"annee"=%i and "nb">=0'%(year))
         processing.runalg("qgis:convexhull",layer,'',0,pathMCP+"/"+str(year)+"/"+geomType+".shp")#il aurait ete possible dutiliser un outil integre 
     layer.setSubsetString('')
-
-
+    i=0
+    #Presence par mailles
+    print 'Presence par maille'
+    pathMaille=path+'/Maille'
+    for year,NULL in years_colors:
+        id_mailles=[] #pour stocker les mailles qui contiennent un point
+        for fl in layer.getFeatures(QgsFeatureRequest(QgsExpression('year("date_obs")=%i and "nb">=0'%(year)))):
+            x=fl.geometry().centroid().asPoint().x()
+            y=fl.geometry().centroid().asPoint().y()
+            grille_feat=grille.getFeatures(QgsFeatureRequest(QgsExpression('x_min($geometry)<'+str(x)+' AND x_max($geometry)>'+str(x)+' AND y_min($geometry)<'+str(y)+' AND y_max($geometry)>'+str(y) )))
+            id_maille= grille_feat.next().id() #normalement un seul
+            id_mailles.append(id_maille) #ajout a la liste des id
+            print id_maille
+        #Creer un shape pour cette annee
+        grille_feat2=grille.getFeatures(QgsFeatureRequest().setFilterFids(id_mailles))
+        if not os.path.exists(pathMaille+'/'+str(year)):
+            os.makedirs(pathMaille+'/'+str(year))
+        QgsVectorFileWriter.writeAsVectorFormat(grille,pathMaille+"/"+str(year)+"/"+geomType+".shp",u'System',grille.dataProvider().crs())
+        grille2=QgsVectorLayer(pathMaille+"/"+str(year)+"/"+geomType+".shp",geomType+str(year),"ogr")
+        grille2.startEditing()
+        for f in grille2.getFeatures():
+            grille2.deleteFeature(f.id())
+        grille2.commitChanges()
+        grille2.startEditing()
+        for f in grille_feat2: #toute les features qui contiennent un point
+            grille2.addFeature(f)
+        grille2.commitChanges()
+            
 #Traitement des MCP
 shps=[]
 first=True
@@ -154,7 +181,13 @@ for anneeMCP in layerMCP.uniqueValues(layerMCP.fieldNameIndex('annee')):
     layerMCPfinal.addFeature(newFeature)#et on integre le MCP de cette anne dans le MCPfinal
 layerMCPfinal.commitChanges()# toutes les annees sont traitees commit
 
-#Ici il faudrait refaire un mcp a partir de l union des MCP, utiliser QgsGeometry::convexHull et mettre a jour la geom
+#Refait un mcp (car l union des MCP n est pas un MCP)
+layerMCPfinal.startEditing()
+for f in layerMCPfinal.getFeatures():
+    newGeom=f.geometry().convexHull()
+    layerMCPfinal.changeGeometry(f.id(),newGeom)
+layerMCPfinal.updateExtents()
+layerMCPfinal.commitChanges()
 
 #Mise a jour du champs area, et suppression des champs parasites
 layerMCPfinal.startEditing()
@@ -163,7 +196,7 @@ for f in layerMCPfinal.getFeatures():
     value=QgsExpression(' $area /1000000').evaluate(f)
     layerMCPfinal.changeAttributeValue(f.id(),field_index,value)
 layerMCPfinal.commitChanges()
-layerMCPfinal.startEditing()
+layerMCPfinal.startEditing() #supression des champs parasites
 field_index=layerMCPfinal.fieldNameIndex('perim')
 layerMCPfinal.deleteAttribute(field_index)
 field_index=layerMCPfinal.fieldNameIndex('id')
@@ -173,8 +206,8 @@ layerMCPfinal.deleteAttribute(field_index)
 layerMCPfinal.updateFields()
 layerMCPfinal.commitChanges()
 
-
-QgsMapLayerRegistry.instance().addMapLayers([layerMCPfinal]) #Ajout a la carte
+#Ajout a la carte
+QgsMapLayerRegistry.instance().addMapLayers([layerMCPfinal]) 
 
 #Symbologie des MCP
 rpass=0
@@ -193,3 +226,26 @@ for year,color in years_colors: #2004 a 2015
         
 root_rule.removeChildAt(0)
 layerMCPfinal.setRendererV2(renderer) # apply the renderer to the layer
+
+#Traitement des mailles de presence (un seul layer avec indication de l annee)
+annees=[]
+for e in os.listdir(pathMaille):
+    if os.isdir(pathMaille+"/"+e):
+        annees.append(e)
+for annee in annees:
+    shapes=[]
+    for e in os.listdir(pathMaille+"/"+annee):
+        if e.endswith(".shp"):
+            shapes.append(e)
+    
+#    for shp in shapes:
+#        file=pathMaille+"/"+annee+"/"+shp
+#        layer=QgsVectorLayer(file,'truc',"ogr")
+#        layer.startEditing()
+#        layer.dataProvider().addAttributes([QgsField('annee', QVariant.Int)]) #ajouter un champs annee
+#        layer.updateFields()
+#        field_index=layer.fieldNameIndex('annee')
+#        for f in layer.getFeatures():
+#            layer.changeAttributeValue(f.id(),field_index,int(annee)) #inserer dans le champs annee (pris depuis le nom du dossier) j aurai du le faire dans l etape anvant
+#        layer.commitChanges()
+#        layer=QgsVectorLayer(file,'truc',"ogr") #Faut recharger le layer (updateFeature peut etre ?)
