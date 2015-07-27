@@ -20,13 +20,16 @@ years_colors=(
 )
 
 #path=QFileDialog.getExistingDirectory()
-path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Orthopteres/Gomphocerippus rufus'
+path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Odonates/Coenagrion mercuriale  (CHARPENTIER, 1840)'
 grille=QgsVectorLayer('/home/users/jbdesbas/Documents/Listes rouges/Evaluation/grilles/2km_Picardie.shp','grille','ogr')
+if os.path.isfile(path+'/data.csv'):
+    os.remove(path+'/data.csv')
+output_file = open(path+'/data.csv', 'w')
 
 listdir=os.listdir(path)
 shapes=[]
 for file in listdir:
-    if file.endswith('.shp') and file!=('MCP.shp') and file!=('MCPfinal.shp'):
+    if file.endswith('.shp') and file!=('MCP.shp') and file!=('MCPfinal.shp')  and file!=('Mailles.shp'):
         shapes.append(file)
 
 for shape in shapes: #Pour chaque fichier shape retenu
@@ -107,7 +110,9 @@ for shape in shapes: #Pour chaque fichier shape retenu
             x=fl.geometry().centroid().asPoint().x()
             y=fl.geometry().centroid().asPoint().y()
             grille_feat=grille.getFeatures(QgsFeatureRequest(QgsExpression('x_min($geometry)<'+str(x)+' AND x_max($geometry)>'+str(x)+' AND y_min($geometry)<'+str(y)+' AND y_max($geometry)>'+str(y) )))
-            id_maille= grille_feat.next().id() #normalement un seul
+            #id_maille= grille_feat.next().id() #normalement un seul
+            for e in grille_feat:
+                id_maille=e.id()
             id_mailles.append(id_maille) #ajout a la liste des id
             print id_maille
         #Creer un shape pour cette annee
@@ -190,11 +195,17 @@ layerMCPfinal.updateExtents()
 layerMCPfinal.commitChanges()
 
 #Mise a jour du champs area, et suppression des champs parasites
+output_file.write('MCP \n\r')
 layerMCPfinal.startEditing()
 for f in layerMCPfinal.getFeatures():
     field_index=layerMCPfinal.fieldNameIndex('area')
     value=QgsExpression(' $area /1000000').evaluate(f)
     layerMCPfinal.changeAttributeValue(f.id(),field_index,value)
+    output_file.write(str(f.attribute('annee')))
+    output_file.write(';')
+    output_file.write(str(value))
+    output_file.write('\n\r')
+    
 layerMCPfinal.commitChanges()
 layerMCPfinal.startEditing() #supression des champs parasites
 field_index=layerMCPfinal.fieldNameIndex('perim')
@@ -212,8 +223,8 @@ QgsMapLayerRegistry.instance().addMapLayers([layerMCPfinal])
 #Symbologie des MCP
 rpass=0
 symbol = QgsSymbolV2.defaultSymbol(layer.geometryType())
-renderer=QgsRuleBasedRendererV2(symbol)
-root_rule = renderer.rootRule()
+rendererMCP=QgsRuleBasedRendererV2(symbol)
+root_rule = rendererMCP.rootRule()
 for year,color in years_colors: #2004 a 2015
         rPass+=1 #Les donnes les plus recentes dessus
         rule = root_rule.children()[0].clone()
@@ -225,12 +236,13 @@ for year,color in years_colors: #2004 a 2015
         root_rule.appendChild(rule)
         
 root_rule.removeChildAt(0)
-layerMCPfinal.setRendererV2(renderer) # apply the renderer to the layer
+layerMCPfinal.setRendererV2(rendererMCP) # apply the renderer to the layer
 
 #Traitement des mailles de presence (un seul layer avec indication de l annee)
 annees=[]
+first=True
 for e in os.listdir(pathMaille):
-    if os.isdir(pathMaille+"/"+e):
+    if os.path.isdir(pathMaille+"/"+e):
         annees.append(e)
 for annee in annees:
     shapes=[]
@@ -238,14 +250,66 @@ for annee in annees:
         if e.endswith(".shp"):
             shapes.append(e)
     
-#    for shp in shapes:
-#        file=pathMaille+"/"+annee+"/"+shp
-#        layer=QgsVectorLayer(file,'truc',"ogr")
-#        layer.startEditing()
-#        layer.dataProvider().addAttributes([QgsField('annee', QVariant.Int)]) #ajouter un champs annee
-#        layer.updateFields()
-#        field_index=layer.fieldNameIndex('annee')
-#        for f in layer.getFeatures():
-#            layer.changeAttributeValue(f.id(),field_index,int(annee)) #inserer dans le champs annee (pris depuis le nom du dossier) j aurai du le faire dans l etape anvant
-#        layer.commitChanges()
-#        layer=QgsVectorLayer(file,'truc',"ogr") #Faut recharger le layer (updateFeature peut etre ?)
+    for shp in shapes:
+        file=pathMaille+"/"+annee+"/"+shp
+        layer=QgsVectorLayer(file,'truc',"ogr")
+        layer.startEditing()
+        layer.dataProvider().addAttributes([QgsField('annee', QVariant.Int)]) #ajouter un champs annee
+        layer.updateFields()
+        field_index=layer.fieldNameIndex('annee')
+        for f in layer.getFeatures():
+            layer.changeAttributeValue(f.id(),field_index,int(annee)) #inserer dans le champs annee (pris depuis le nom du dossier) j aurai du le faire dans l etape anvant
+        layer.commitChanges()
+        layer=QgsVectorLayer(file,'truc',"ogr") #Faut recharger le layer (updateFeature peut etre ?)
+        if first: #Cloner le layer precend et le vider a la premiere passe
+            QgsVectorFileWriter.writeAsVectorFormat(layer,path+"/Mailles.shp",u'System',layer.dataProvider().crs())
+            layerMailles=QgsVectorLayer(path+"/Mailles.shp","Mailles","ogr")
+            layerMailles.startEditing()
+            for f in layerMailles.getFeatures():
+                layerMailles.deleteFeature(f.id())
+            layerMailles.commitChanges()
+            first=False 
+        layerMailles.startEditing()
+        for f in layer.getFeatures():
+            layerMailles.addFeature(f)
+        layerMailles.commitChanges()
+
+#Ici, il faut virer les mailles doublons (meme annee et meme id_maille)
+layerMailles.startEditing()
+for annee in annees:
+    field_index=layerMailles.fieldNameIndex('ID')
+    id_mailles=layerMailles.uniqueValues(field_index)
+    for id in id_mailles:
+        i=0
+        for f in layerMailles.getFeatures(QgsFeatureRequest(QgsExpression('"annee"='+str(annee)+' AND "ID"='+str(id)))):
+            if i>0: #Si plus de 1 objet, supprimer tous les suivants
+                layerMailles.deleteFeature(f.id())
+            i+=1
+layerMailles.commitChanges()
+
+nb_mailles_total=len(layerMailles.uniqueValues(layerMailles.fieldNameIndex('ID')))
+print 'nb maille total : '+str(nb_mailles_total)
+output_file.write('\n\r Nb total maille;')
+output_file.write(str(nb_mailles_total))
+#Compter le nombre d'unique value de chaque annee
+
+
+#Ajout et symbologie de la grille
+QgsMapLayerRegistry.instance().addMapLayers([layerMailles])
+rpass=0
+symbol = QgsSymbolV2.defaultSymbol(layer.geometryType())
+rendererMailles=QgsRuleBasedRendererV2(symbol)
+root_rule = rendererMailles.rootRule()
+for year,color in years_colors: #2004 a 2015
+        rPass+=1 #Les donnes les plus recentes dessus
+        rule = root_rule.children()[0].clone()
+        rule.setLabel(str(year))
+        rule.setFilterExpression('"annee"=%i'%(year))
+        rule.symbol().setColor(QColor(color))
+        rule.symbol().symbolLayer(0).setRenderingPass(rPass)
+        rule.symbol().setAlpha(0.3)
+        root_rule.appendChild(rule)
+        
+root_rule.removeChildAt(0)
+layerMailles.setRendererV2(rendererMailles) # apply the renderer to the layer
+output_file.close()
