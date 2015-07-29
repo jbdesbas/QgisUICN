@@ -2,6 +2,8 @@ from PyQt4.QtGui import *
 from PyQt4.QtCore import *
 import processing
 import os
+import shutil
+from qgis.analysis import *
 
 canvas = iface.mapCanvas()
 years_colors=(
@@ -134,11 +136,11 @@ for shape in shapes: #Pour chaque fichier shape retenu
 shps=[]
 first=True
 for annee in os.listdir(pathMCP): #pour chaque dossier annee
-    annee2=int(annee)
-    annee=pathMCP+"/"+annee
-    if(os.path.isdir(annee)): #S assurer que c est bien un dossier
-        for file in os.listdir(annee):
-            file=annee+"/"+file
+    dir_annee=pathMCP+"/"+annee
+    if(os.path.isdir(dir_annee)): #S assurer que c est bien un dossier
+        annee=int(annee)
+        for file in os.listdir(dir_annee):
+            file=dir_annee+"/"+file
             if file.endswith('.shp'): #Ne prendre que les shape
                 layer=QgsVectorLayer(file,'toto',"ogr")
                 print file
@@ -147,13 +149,14 @@ for annee in os.listdir(pathMCP): #pour chaque dossier annee
                 layer.updateFields()
                 field_index=layer.fieldNameIndex('annee')
                 for f in layer.getFeatures():
-                    layer.changeAttributeValue(f.id(),field_index,annee2) #inserer dans le champs annee (pris depuis le nom du dossier) j aurai du le faire dans l etape anvant
+                    layer.changeAttributeValue(f.id(),field_index,annee) #inserer dans le champs annee (pris depuis le nom du dossier) j aurai du le faire dans l etape anvant
                 layer.commitChanges()
                 layer=QgsVectorLayer(file,'toto',"ogr") #Faut recharger le layer sinon ca marche pas je sais pas pquoi et ca m enerve
 
                 if first: #Cloner le layer precend et le vider a la premiere passe
-                    QgsVectorFileWriter.writeAsVectorFormat(layer,path+"/MCP.shp",u'System',layer.dataProvider().crs())
-                    layerMCP=QgsVectorLayer(path+"/MCP.shp","MCP","ogr")
+                    test='okokokok'
+                    QgsVectorFileWriter.writeAsVectorFormat(layer,path+"/MCP/MCP.shp",u'System',layer.dataProvider().crs())
+                    layerMCP=QgsVectorLayer(path+"/MCP/MCP.shp","MCP","ogr")
                     layerMCP.startEditing()
                     for f in layerMCP.getFeatures():
                         layerMCP.deleteFeature(f.id())
@@ -194,19 +197,6 @@ for f in layerMCPfinal.getFeatures():
 layerMCPfinal.updateExtents()
 layerMCPfinal.commitChanges()
 
-#Mise a jour du champs area, et suppression des champs parasites
-output_file.write('MCP \n\r')
-layerMCPfinal.startEditing()
-for f in layerMCPfinal.getFeatures():
-    field_index=layerMCPfinal.fieldNameIndex('area')
-    value=QgsExpression(' $area /1000000').evaluate(f)
-    layerMCPfinal.changeAttributeValue(f.id(),field_index,value)
-    output_file.write(str(f.attribute('annee')))
-    output_file.write(';')
-    output_file.write(str(value))
-    output_file.write('\n\r')
-    
-layerMCPfinal.commitChanges()
 layerMCPfinal.startEditing() #supression des champs parasites
 field_index=layerMCPfinal.fieldNameIndex('perim')
 layerMCPfinal.deleteAttribute(field_index)
@@ -216,6 +206,33 @@ field_index=layerMCPfinal.fieldNameIndex('value')
 layerMCPfinal.deleteAttribute(field_index)
 layerMCPfinal.updateFields()
 layerMCPfinal.commitChanges()
+
+#MCP total des 10ans
+layerMCPfinal.startEditing()
+processing.runalg("qgis:convexhull",layerMCPfinal,'',0,pathMCP+"/MCPtotal.shp")
+layerMCPtotal=QgsVectorLayer(pathMCP+"/MCPtotal.shp",'tototo','ogr')
+for f in layerMCPtotal.getFeatures():#un seul normalement
+    geom=QgsGeometry(f.geometry())
+newFeature=QgsFeature(layerMCPfinal.dataProvider().fields())
+newFeature.setGeometry(geom)
+newFeature.setAttribute("annee",0)
+okok = layerMCPfinal.addFeature(newFeature)
+layerMCPfinal.commitChanges()
+
+#Mise a jour du champs area
+output_file.write('MCP \n\r')
+layerMCPfinal.startEditing()
+for f in layerMCPfinal.getFeatures():
+    field_index=layerMCPfinal.fieldNameIndex('area')
+    value=QgsExpression(' $area /1000000').evaluate(f)
+    layerMCPfinal.changeAttributeValue(f.id(),field_index,value)
+    output_file.write(str(f.attribute('annee')))
+    output_file.write(';')
+    output_file.write(str(int(round(value))))
+    output_file.write('\n\r')
+layerMCPfinal.commitChanges()
+
+
 
 #Ajout a la carte
 QgsMapLayerRegistry.instance().addMapLayers([layerMCPfinal]) 
@@ -237,7 +254,7 @@ for year,color in years_colors: #2004 a 2015
         
 root_rule.removeChildAt(0)
 layerMCPfinal.setRendererV2(rendererMCP) # apply the renderer to the layer
-
+canvas.setExtent(layerMCPfinal.extent()) #zoomer sur la couche mcp
 #Traitement des mailles de presence (un seul layer avec indication de l annee)
 annees=[]
 first=True
@@ -287,13 +304,19 @@ for annee in annees:
             i+=1
 layerMailles.commitChanges()
 
+#Compter le nombre d'unique value de chaque annee
 nb_mailles_total=len(layerMailles.uniqueValues(layerMailles.fieldNameIndex('ID')))
 print 'nb maille total : '+str(nb_mailles_total)
+output_file.write('\n\r Mailles;')
+for year,NULL in years_colors:
+    unique_values=set()
+    output_file.write('\n\r')
+    output_file.write(str(year)+';')
+    for f in layerMailles.getFeatures(QgsFeatureRequest().setFilterExpression('"annee"='+str(year))):
+        unique_values.add(f['ID'])
+    output_file.write(str(len(unique_values)))
 output_file.write('\n\r Nb total maille;')
 output_file.write(str(nb_mailles_total))
-#Compter le nombre d'unique value de chaque annee
-
-
 #Ajout et symbologie de la grille
 QgsMapLayerRegistry.instance().addMapLayers([layerMailles])
 rpass=0
@@ -313,3 +336,10 @@ for year,color in years_colors: #2004 a 2015
 root_rule.removeChildAt(0)
 layerMailles.setRendererV2(rendererMailles) # apply the renderer to the layer
 output_file.close()
+
+#Suppresion des shp qui servent plus a rien :
+shutil.rmtree(path+'/MCP')
+shutil.rmtree(path+'/Maille')
+
+project = QgsProject.instance()
+project.write(QFileInfo(path+'/projet.qgs')) #enregistre le projet
