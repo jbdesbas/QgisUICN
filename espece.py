@@ -21,8 +21,8 @@ years_colors=(
     (2015,'#1a9641'),
 )
 
-#path=QFileDialog.getExistingDirectory()
-path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Odonates/Coenagrion mercuriale  (CHARPENTIER, 1840)'
+path=QFileDialog.getExistingDirectory()
+#path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Odonates/Coenagrion mercuriale  (CHARPENTIER, 1840)'
 grille=QgsVectorLayer('/home/users/jbdesbas/Documents/Listes rouges/Evaluation/grilles/2km_Picardie.shp','grille','ogr')
 if os.path.isfile(path+'/data.csv'):
     os.remove(path+'/data.csv')
@@ -131,7 +131,7 @@ for shape in shapes: #Pour chaque fichier shape retenu
         for f in grille_feat2: #toute les features qui contiennent un point
             grille2.addFeature(f)
         grille2.commitChanges()
-            
+           
 #Traitement des MCP
 shps=[]
 first=True
@@ -290,7 +290,8 @@ for annee in annees:
         for f in layer.getFeatures():
             layerMailles.addFeature(f)
         layerMailles.commitChanges()
-
+        
+        
 #Ici, il faut virer les mailles doublons (meme annee et meme id_maille)
 layerMailles.startEditing()
 for annee in annees:
@@ -304,17 +305,56 @@ for annee in annees:
             i+=1
 layerMailles.commitChanges()
 
+#Compter les effectifs par maille (uniquement sur les points)
+print "Compte des effectifs max par maille et par annee"
+layerMailles.startEditing()
+layerMailles.dataProvider().addAttributes([QgsField('effMax', QVariant.Int)]) #Ajout du champs pour recuperer la valeur
+layerMailles.updateFields()
+#layerMailles.commitChanges()
+for file in os.listdir(path):
+    if file.startswith("espace_point") and file.endswith(".shp"):
+        shape=file
+layer_pts=QgsVectorLayer(path+"/"+shape,"abcd","ogr")
+for annee in annees:
+    for f in layerMailles.getFeatures(QgsFeatureRequest().setFilterExpression('annee='+str(annee))):
+        xmin=str(f.attribute("XMIN"))
+        xmax=str(f.attribute("XMAX"))
+        ymin=str(f.attribute("YMIN"))
+        ymax=str(f.attribute("YMAX"))
+        features_pts=layer_pts.getFeatures(QgsFeatureRequest().setFilterExpression('$x>'+xmin+' AND $x<'+xmax+' AND $y>'+ymin+' AND $y<'+ymax+' AND annee='+str(annee)))
+        effectifs=[]
+        for fp in features_pts:
+            effectifs.append(fp.attribute("nb"))
+        if len(effectifs)>0: #Si il y au moins 1 points dans la maille
+            effectifs_max=max(effectifs)
+            print annee
+            print effectifs_max
+            #field_index=layerMailles.fieldNameIndex("effMax")
+            #layerMailles.startEditing()
+            #test=layerMailles.changeAttributeValue(f.id(),field_index,effectifs_max)
+            f["effMax"]=effectifs_max
+        else:
+            f["effMax"]=0
+        layerMailles.updateFeature(f)
+            
+layerMailles.commitChanges()
+layerMailles=QgsVectorLayer(path+"/Mailles.shp","Mailles","ogr") #jesaispaspourquoiilfautabsolumentcamaiscamarche
+
 #Compter le nombre d'unique value de chaque annee
 nb_mailles_total=len(layerMailles.uniqueValues(layerMailles.fieldNameIndex('ID')))
 print 'nb maille total : '+str(nb_mailles_total)
 output_file.write('\n\r Mailles;')
 for year,NULL in years_colors:
+    somme_effectifs=0
     unique_values=set()
     output_file.write('\n\r')
     output_file.write(str(year)+';')
     for f in layerMailles.getFeatures(QgsFeatureRequest().setFilterExpression('"annee"='+str(year))):
         unique_values.add(f['ID'])
+        somme_effectifs+=f["effMax"]
     output_file.write(str(len(unique_values)))
+    output_file.write(";")
+    output_file.write(str(somme_effectifs))
 output_file.write('\n\r Nb total maille;')
 output_file.write(str(nb_mailles_total))
 #Ajout et symbologie de la grille
