@@ -21,7 +21,9 @@ years_colors=(
     (2015,'#1a9641'),
 )
 
-path=QFileDialog.getExistingDirectory()
+path=QFileDialog.getExistingDirectory(directory='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/')
+if path=='':
+    raise ValueError('Pas de repertoire')
 #path='/home/users/jbdesbas/Documents/Listes rouges/Evaluation/Odonates/Coenagrion mercuriale  (CHARPENTIER, 1840)'
 grille=QgsVectorLayer('/home/users/jbdesbas/Documents/Listes rouges/Evaluation/grilles/2km_Picardie.shp','grille','ogr')
 if os.path.isfile(path+'/data.csv'):
@@ -70,7 +72,7 @@ for shape in shapes: #Pour chaque fichier shape retenu
         rule = root_rule.children()[0].clone()
         rule.setLabel('prosp neg')
         rule.setFilterExpression('"nb"=-1')
-        rule.symbol().symbolLayer(0).setName("square")
+        rule.symbol().symbolLayer(0).setName("triangle")
         rule.symbol().setColor(QColor('white'))
         rule.symbol().symbolLayer(0).setRenderingPass(rPass)
         root_rule.appendChild(rule)
@@ -340,10 +342,18 @@ for annee in annees:
 layerMailles.commitChanges()
 layerMailles=QgsVectorLayer(path+"/Mailles.shp","Mailles","ogr") #jesaispaspourquoiilfautabsolumentcamaiscamarche
 
-#Compter le nombre d'unique value de chaque annee
-nb_mailles_total=len(layerMailles.uniqueValues(layerMailles.fieldNameIndex('ID')))
+#Compter le nombre d'unique value de chaque annee et l'effectif max par maille
+unique_ids=layerMailles.uniqueValues(layerMailles.fieldNameIndex('ID'))
+nb_mailles_total=len(unique_ids)
+eff_max_total=0
+for id in unique_ids:
+    eff=[]
+    for f in layerMailles.getFeatures(QgsFeatureRequest().setFilterExpression('"ID"='+str(id))):
+        eff.append(f["effMax"])
+    eff_max_maille=max(eff)
+    eff_max_total+=eff_max_maille
 print 'nb maille total : '+str(nb_mailles_total)
-output_file.write('\n\r Mailles;')
+output_file.write('\n\r Mailles;Nombre;Effectif')
 for year,NULL in years_colors:
     somme_effectifs=0
     unique_values=set()
@@ -355,8 +365,10 @@ for year,NULL in years_colors:
     output_file.write(str(len(unique_values)))
     output_file.write(";")
     output_file.write(str(somme_effectifs))
-output_file.write('\n\r Nb total maille;')
+output_file.write('\n\r Total;')
 output_file.write(str(nb_mailles_total))
+output_file.write(';')
+output_file.write(str(eff_max_total))
 #Ajout et symbologie de la grille
 QgsMapLayerRegistry.instance().addMapLayers([layerMailles])
 rpass=0
@@ -383,3 +395,5 @@ shutil.rmtree(path+'/Maille')
 
 project = QgsProject.instance()
 project.write(QFileInfo(path+'/projet.qgs')) #enregistre le projet
+
+print "fini!"
