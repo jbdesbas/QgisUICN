@@ -103,8 +103,12 @@ for shape in shapes: #Pour chaque fichier shape retenu
             os.makedirs(pathMCP+'/'+str(year))
         layer.setSubsetString('"annee"=%i and "nb">=0'%(year))
         processing.runalg("qgis:convexhull",layer,'',0,pathMCP+"/"+str(year)+"/"+geomType+".shp")#il aurait ete possible dutiliser un outil integre 
+    layer.setSubsetString('"annee">2004 and "nb">=0')
+    if not os.path.exists(pathMCP+'/0'):
+        os.makedirs(pathMCP+'/0')
+    processing.runalg("qgis:convexhull",layer,'',0,pathMCP+"/0/"+geomType+".shp") #Et on fait ici un mcp a partir de 2005
     layer.setSubsetString('')
-    i=0
+    i=0 #Sert a quoi celui la ?
     #Presence par mailles
     print 'Presence par maille'
     pathMaille=path+'/Maille'
@@ -156,7 +160,6 @@ for annee in os.listdir(pathMCP): #pour chaque dossier annee
                 layer=QgsVectorLayer(file,'toto',"ogr") #Faut recharger le layer sinon ca marche pas je sais pas pquoi et ca m enerve
 
                 if first: #Cloner le layer precend et le vider a la premiere passe
-                    test='okokokok'
                     QgsVectorFileWriter.writeAsVectorFormat(layer,path+"/MCP/MCP.shp",u'System',layer.dataProvider().crs())
                     layerMCP=QgsVectorLayer(path+"/MCP/MCP.shp","MCP","ogr")
                     layerMCP.startEditing()
@@ -209,18 +212,6 @@ layerMCPfinal.deleteAttribute(field_index)
 layerMCPfinal.updateFields()
 layerMCPfinal.commitChanges()
 
-#MCP total des 10ans
-layerMCPfinal.startEditing()
-processing.runalg("qgis:convexhull",layerMCPfinal,'',0,pathMCP+"/MCPtotal.shp")
-layerMCPtotal=QgsVectorLayer(pathMCP+"/MCPtotal.shp",'tototo','ogr')
-for f in layerMCPtotal.getFeatures():#un seul normalement
-    geom=QgsGeometry(f.geometry())
-newFeature=QgsFeature(layerMCPfinal.dataProvider().fields())
-newFeature.setGeometry(geom)
-newFeature.setAttribute("annee",0)
-okok = layerMCPfinal.addFeature(newFeature)
-layerMCPfinal.commitChanges()
-
 #Mise a jour du champs area
 output_file.write('MCP \n\r')
 layerMCPfinal.startEditing()
@@ -233,8 +224,6 @@ for f in layerMCPfinal.getFeatures():
     output_file.write(str(int(round(value))))
     output_file.write('\n\r')
 layerMCPfinal.commitChanges()
-
-
 
 #Ajout a la carte
 QgsMapLayerRegistry.instance().addMapLayers([layerMCPfinal]) 
@@ -292,7 +281,6 @@ for annee in annees:
         for f in layer.getFeatures():
             layerMailles.addFeature(f)
         layerMailles.commitChanges()
-        
         
 #Ici, il faut virer les mailles doublons (meme annee et meme id_maille)
 layerMailles.startEditing()
