@@ -75,7 +75,7 @@ if writecsv==True:
 		i+=1
 	
 	del writer
-	del csOut
+	del csvOut
 	del fields
 
 #Stats sur les donnees
