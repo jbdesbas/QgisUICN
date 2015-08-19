@@ -27,7 +27,7 @@ for id_esp in data["id_espece"].unique():
 			data_plot.plot(linestyle='-', label=s, color=color)
 		
 	plt.legend(loc='upper left')
-	titre=unicode(data[(data.id_espece==id_esp)].nom_f.values[1],'utf-8')
+	titre=unicode(data[(data.id_espece==id_esp)].nom_f.values[0],'utf-8')
 	titre=unicodedata.normalize('NFD', titre).encode('ascii', 'ignore') #pour gerer les accents des noms
 	plt.title(titre)
 	plt.xticks(range(1,53,4))
