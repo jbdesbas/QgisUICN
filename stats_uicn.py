@@ -5,6 +5,7 @@ import os
 from geopandas.tools import sjoin
 import shapely
 from sys import argv
+import numpy as np
 
 if len(argv)<3: #si on a pas donner le debut et fin de ref
 	years=range(2006,2016) #les 10 dernierse annes (ou periode de ref)
@@ -82,17 +83,18 @@ occup_an.to_file(path+'/out/occup_an.shp')
 occup_per=occupation('periode')
 occup_per.to_file(path+'/out/occup_per.shp')
 #Caclule de la zone pour la periode de ref
+data_centroid=gpd.GeoDataFrame(data.copy())
 data_centroid_ref=data_centroid[data_centroid["date_obs"].dt.year.isin(years)]
 occup_ref=sjoin(maillage[['ID','geometry']],data_centroid_ref[['geometry']])
-occup_ref=jointure2.drop_duplicates(['geometry'])
+occup_ref=occup_ref.drop_duplicates(['geometry'])
 occup_ref.to_file(path+'/out/occupation.shp')
 
 ##### Stats #####
 ref=pd.DataFrame()
 ref["annee"]=years #Pour les jointures 
 ##Surface des mcps par an
-mcps["mcp_area"]=mcps.area/1000000
-stats=pd.merge(ref,mcps[["annee","mcp_area"]], on="annee",how="left")
+mcp_an["mcp_area"]=mcp_an.area/1000000
+stats=pd.merge(ref,mcp_an[["annee","mcp_area"]], on="annee",how="left")
 #mcp_ref.area.sum() #sur la periode de ref
 
 ##Surface des mailles par an et sur la periode de ref
@@ -102,7 +104,6 @@ occup_grp["annee"]=occup_grp.index #il faudrait que j apprenne a utiliser les in
 
 stats=stats.merge(occup_grp[["annee","occup_area"]],on="annee",how="left")
 
-
 ##Regression lin
 def regress(x,y):
 	A = np.vstack([x, np.ones(len(x))]).T
@@ -110,6 +111,10 @@ def regress(x,y):
 
 tend_mcp=regress(stats["annee"],stats["mcp_area"])
 tend_occup=regress(stats["annee"],stats["occup_area"])
+
+##Variation entre deux periode
+
+
 
 #####Rapport
 rapport=pd.DataFrame()
