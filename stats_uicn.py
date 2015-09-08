@@ -13,8 +13,8 @@ else:
 	years=range(argv[1],argv[2]+1)
 	print "Periode "+str(argv[1])+" - "+str(argv[2])
 
-path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Conocephalus dorsalis'
-maillage=gpd.GeoDataFrame.from_file('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/grilles/2km_Picardie.shp')
+path='/home/jb/Code/python/UICN/V2/'
+maillage=gpd.GeoDataFrame.from_file('/home/jb/Code/python/UICN/V2/grille/2km_Picardie.shp')
 lamb93={u'lon_0': 3, 'wktext': True, u'ellps': u'GRS80', u'y_0': 6600000, u'no_defs': True, u'proj': u'lcc', u'x_0': 700000, u'units': u'm', u'lat_2': 44, u'lat_1': 49, u'lat_0': 46.5}
 
 
@@ -89,9 +89,45 @@ occup_per.to_file(path+'/out/occup_per.shp')
 mcp_per=occurence('periode')
 mcp_per.to_file(path+'/out/occurence_per.shp')
 
+##### Stats #####
+ref=pd.DataFrame()
+ref["annee"]=years #Pour les jointures 
+##Surface des mcps par an
+mcps["mcp_area"]=mcps.area/1000000
+stats=pd.merge(ref,mcps[["annee","mcp_area"]], on="annee",how="left")
+#mcp_ref.area.sum() #sur la periode de ref
+
+##Surface des mailles par an et sur la periode de ref
+occup_an["occup_area"]=occup_an.area/1000000
+occup_grp=pd.DataFrame(occup_an.groupby('annee')["occup_area"].sum())
+occup_grp["annee"]=occup_grp.index #il faudrait que j apprenne a utiliser les index sur pandas
+
+stats=stats.merge(occup_grp[["annee","occup_area"]],on="annee",how="left")
+
+
+##Regression lin
+def regress(x,y):
+	A = np.vstack([x, np.ones(len(x))]).T
+	return np.linalg.lstsq(A, y)[0]
+
+tend_mcp=regress(stats["annee"],stats["mcp_area"])
+tend_occup=regress(stats["annee"],stats["occup_area"])
 
 #####Rapport
 rapport=pd.DataFrame()
 """Champs a prevoir
 (id , nomf , noms ), occupation p1, occupation relat p1, occupation p2, occupation relat p2, var occupation, occurence p1, occurence p2, var occurence
+"""
+
+
+#Compilation sur pdf
+"""
+c = canvas.Canvas(path+"/hello.pdf")
+c.drawString(100,750,"UICN")
+c.drawString(150,300,"Occupation : "+str(int(round(occup_ref.area.sum()/1000000)))+" km2")
+c.drawString(350,300,"Occurence : "+str(int(round(mcp_ref.area.sum()/1000000)))+" km2")
+c.drawImage(path+"/testmcp.png",0,0,width=300,preserveAspectRatio=True, anchor="sw")
+c.drawImage(path+"/testoccup.png",300,0,width=300,preserveAspectRatio=True, anchor="sw")
+c.drawImage(path+"/carto.png",0,500,width=600,preserveAspectRatio=True, anchor="sw")
+c.save()
 """
