@@ -1,4 +1,5 @@
 #Ne marche que avec du lambert93 (a fixer peutetre plus tard)
+#stats_uicn.py path debut fin
 import geopandas as gpd
 import pandas as pd
 import os
@@ -7,14 +8,15 @@ import shapely
 from sys import argv
 import numpy as np
 
-if len(argv)<3: #si on a pas donner le debut et fin de ref
+if len(argv)<4: #si on a pas donner le debut et fin de ref
 	years=range(2005,2015+1) #les 10 dernierse annes (ou periode de ref)
 	print "Periode par defaut utilisee : 2006-2015"
 else:
 	years=range(argv[1],argv[2]+1)
-	print "Periode "+str(argv[1])+" - "+str(argv[2])
+	print "Periode "+str(argv[2])+" - "+str(argv[3])
 
-path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Conocephalus fuscus/' #avec le / de la fin
+#path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Aiolopus thalassinus/' #avec le / de la fin
+path=argv[1]
 #maillage=gpd.GeoDataFrame.from_file('/home/jb/Code/python/UICN/V2/grille/2km_Picardie.shp')
 maillage=gpd.GeoDataFrame.from_file('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/grilles/2km_Picardie.shp')
 data_grpe=pd.read_csv('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/data_grp.csv')
@@ -52,7 +54,7 @@ for shape in shapes:
 
 data=gpd.GeoDataFrame(pd.concat(listData,ignore_index=True))
 ###Travail sur lot de donnees
-data=data[data["nb"] >= 0] #filtre des obs négative
+data=data[data["nb"] >= 0] #filtre des obs negative
 data=data[data.geometry.area < 5000000] #filtre des polygon sup a 5km2
 data["date_obs"]=pd.to_datetime(data["date_obs"]) #convertire la date
 data["annee"]=data["date_obs"].dt.year
@@ -134,23 +136,14 @@ stats_per["periode"]=['P1','P2']
 stats_per["duree"]=[(max(periode1)-min(periode1)+1),(max(periode2)-min(periode2)+1)]
 
 occup_per["occup_area"]=occup_per.area/1000000
-stats_per["occup"]=pd.DataFrame(occup_per[occup_per["periode"].isin(['P1','P2'])].groupby('periode')["occup_area"].sum()).values
 
+stats_per=pd.merge(stats_per,pd.DataFrame(occup_per[occup_per["periode"].isin(['P1','P2'])].groupby('periode')[["periode","occup_area"]].sum()), right_index=True, left_on="periode", how="left") #corrgier pour si pas de citations sur une des deux periodes
+stats_per["occup"]=stats_per["occup_area"] #moche
 mcp_per["mcp_area"]=mcp_per.area/1000000
 stats_per=pd.merge(stats_per,mcp_per[["periode","mcp_area"]], on="periode",how="left")
 
 #####Rapport
 rapport=pd.DataFrame()
-
-rapport["occupation"]=[occup_ref.area.sum()/1000000]
-rapport["occup rel P1"]=stats_per[stats_per["periode"]=='P1']['occup'].values/occupP1
-rapport["occup rel P2"]=stats_per[stats_per["periode"]=='P2']['occup'].values/occupP2
-rapport["var occup"]=(rapport["occup rel P2"]/(rapport["occup rel P1"]))-1
-
-rapport["occurence"]=mcp_ref.area.values/1000000
-rapport["occurenceP1"]=mcp_per[mcp_per['periode']=='P1'].area.values/1000000
-rapport["occurenceP2"]=mcp_per[mcp_per['periode']=='P2'].area.values/1000000
-rapport["var occurence"]=(rapport["occurenceP2"]/(rapport["occurenceP1"]))-1
 
 rapport["citations"]=[len(data[data["annee"].between(min(years),max(years))].index)]
 rapport["citationsP1"]=[len(data[data["annee"].between(min(periode1),max(periode1))].index)]
@@ -158,6 +151,21 @@ rapport["citations rel P1"]=rapport["citationsP1"]/citationsP1
 rapport["citationsP2"]=[len(data[data["annee"].between(min(periode2),max(periode2))].index)]
 rapport["citations rel P2"]=rapport["citationsP2"]/citationsP2
 rapport["var citations"]=(rapport["citations rel P2"]/(rapport["citations rel P1"]))-1
+
+rapport["occurence"]=mcp_ref.area.values/1000000
+rapport["occurenceP1"]=[mcp_per[mcp_per['periode']=='P1'].area.values/1000000]
+rapport["occurenceP2"]=[mcp_per[mcp_per['periode']=='P2'].area.values/1000000]
+rapport["var occurence"]=(rapport["occurenceP2"]/(rapport["occurenceP1"]))-1
+
+rapport["occupation"]=[occup_ref.area.sum()/1000000]
+rapport["occup P1"]=stats_per[stats_per["periode"]=='P1']['occup'].values
+rapport["occup rel P1"]=rapport["occup P1"]/occupP1
+rapport["occup P2"]=stats_per[stats_per["periode"]=='P2']['occup'].values
+rapport["occup rel P2"]=rapport["occup P2"]/occupP2
+rapport["var occup"]=(rapport["occup rel P2"]/(rapport["occup rel P1"]))-1
+
+
+
 rapport.to_csv(path+"rapport.csv",index=False,decimal=",")
 
 """Champs a prevoir
