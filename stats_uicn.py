@@ -38,6 +38,9 @@ def occupation(col):  #colone pour regrouper donnes
 	occup=occup.drop_duplicates(['geometry',col]) #On vire les doublons
 	return occup
 
+if not os.path.exists(path+'out'):
+	os.makedirs(path+'out')
+
 listData=[]
 shapes=[]
 
@@ -154,3 +157,4 @@ c.drawImage(path+"/testoccup.png",300,0,width=300,preserveAspectRatio=True, anch
 c.drawImage(path+"/carto.png",0,500,width=600,preserveAspectRatio=True, anchor="sw")
 c.save()
 """
+
