@@ -15,7 +15,7 @@ else:
 	years=range(argv[1],argv[2]+1)
 	print "Periode "+str(argv[2])+" - "+str(argv[3])
 
-#path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Aiolopus thalassinus/' #avec le / de la fin
+#path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Calliptamus italicus/' #avec le / de la fin
 path=argv[1]
 #maillage=gpd.GeoDataFrame.from_file('/home/jb/Code/python/UICN/V2/grille/2km_Picardie.shp')
 maillage=gpd.GeoDataFrame.from_file('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/grilles/2km_Picardie.shp')
@@ -153,8 +153,8 @@ rapport["citations rel P2"]=rapport["citationsP2"]/citationsP2
 rapport["var citations"]=(rapport["citations rel P2"]/(rapport["citations rel P1"]))-1
 
 rapport["occurence"]=mcp_ref.area.values/1000000
-rapport["occurenceP1"]=[mcp_per[mcp_per['periode']=='P1'].area.values/1000000]
-rapport["occurenceP2"]=[mcp_per[mcp_per['periode']=='P2'].area.values/1000000]
+rapport["occurenceP1"]=mcp_per[mcp_per['periode']=='P1'].area.values/1000000
+rapport["occurenceP2"]=mcp_per[mcp_per['periode']=='P2'].area.values/1000000
 rapport["var occurence"]=(rapport["occurenceP2"]/(rapport["occurenceP1"]))-1
 
 rapport["occupation"]=[occup_ref.area.sum()/1000000]
