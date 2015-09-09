@@ -8,19 +8,18 @@ from sys import argv
 import numpy as np
 
 if len(argv)<3: #si on a pas donner le debut et fin de ref
-	years=range(2006,2016) #les 10 dernierse annes (ou periode de ref)
+	years=range(2005,2015+1) #les 10 dernierse annes (ou periode de ref)
 	print "Periode par defaut utilisee : 2006-2015"
 else:
 	years=range(argv[1],argv[2]+1)
 	print "Periode "+str(argv[1])+" - "+str(argv[2])
 
-path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Conocephalus fuscus/'
+path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Conocephalus fuscus/' #avec le / de la fin
 #maillage=gpd.GeoDataFrame.from_file('/home/jb/Code/python/UICN/V2/grille/2km_Picardie.shp')
 maillage=gpd.GeoDataFrame.from_file('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/grilles/2km_Picardie.shp')
-lamb93={u'lon_0': 3, 'wktext': True, u'ellps': u'GRS80', u'y_0': 6600000, u'no_defs': True, u'proj': u'lcc', u'x_0': 700000, u'units': u'm', u'lat_2': 44, u'lat_1': 49, u'lat_0': 46.5}
-#Aller ensuite prendre les data dans data_groupe.csv
-
 data_grpe=pd.read_csv('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/data_grp.csv')
+debut=False
+lamb93={u'lon_0': 3, 'wktext': True, u'ellps': u'GRS80', u'y_0': 6600000, u'no_defs': True, u'proj': u'lcc', u'x_0': 700000, u'units': u'm', u'lat_2': 44, u'lat_1': 49, u'lat_0': 46.5}
 
 def occurence(col): #colone pour regrouper donnes
 	mcps=gpd.GeoSeries(data.groupby(col)['geometry'].agg(shapely.ops.unary_union))
@@ -70,8 +69,14 @@ data.loc[data["annee"].isin(periode2),'periode']='P2'
 data.loc[data["annee"]<min(years),'periode']='Ant' #pour les anterierus
 data.loc[data["annee"]>max(years),'periode']='Post' #Trois pour les posterieur
 
-occupP1=data_grpe[data_grpe["debut"]==min(periode1)][data_grpe["fin"]==max(periode1)]["occup"].values[0] #Erreur ici si la periode nest pas dispo
-occupP2=data_grpe[data_grpe["debut"]==min(periode2)][data_grpe["fin"]==max(periode2)]["occup"].values[0] #Erreur ici si la periode
+
+dataP1=data_grpe[data_grpe["debut"]==min(periode1)][data_grpe["fin"]==max(periode1)]
+dataP2=data_grpe[data_grpe["debut"]==min(periode2)][data_grpe["fin"]==max(periode2)]
+occupP1=dataP1["occup"].values[0] #Erreur ici si la periode nest pas dispo
+occupP2=dataP2["occup"].values[0] #Erreur ici si la periode
+citationsP1=dataP1["citations"].values[0]
+citationsP2=dataP2["citations"].values[0]
+
 
 ##### Zone d occurence #########
 #Un mcp par annee
@@ -93,6 +98,7 @@ occup_per=occupation('periode')
 occup_per.to_file(path+'/out/occup_per.shp')
 #Caclule de la zone pour la periode de ref
 data_centroid=gpd.GeoDataFrame(data.copy())
+data_centroid['geometry']=data['geometry'].centroid
 data_centroid_ref=data_centroid[data_centroid["date_obs"].dt.year.isin(years)]
 occup_ref=sjoin(maillage[['ID','geometry']],data_centroid_ref[['geometry']])
 occup_ref=occup_ref.drop_duplicates(['geometry'])
@@ -140,8 +146,20 @@ rapport["occupation"]=[occup_ref.area.sum()/1000000]
 rapport["occup rel P1"]=stats_per[stats_per["periode"]=='P1']['occup'].values/occupP1
 rapport["occup rel P2"]=stats_per[stats_per["periode"]=='P2']['occup'].values/occupP2
 rapport["var occup"]=(rapport["occup rel P2"]/(rapport["occup rel P1"]))-1
-if debug == True :
-	#Champs en option
+
+rapport["occurence"]=mcp_ref.area.values/1000000
+rapport["occurenceP1"]=mcp_per[mcp_per['periode']=='P1'].area.values/1000000
+rapport["occurenceP2"]=mcp_per[mcp_per['periode']=='P2'].area.values/1000000
+rapport["var occurence"]=(rapport["occurenceP2"]/(rapport["occurenceP1"]))-1
+
+rapport["citations"]=[len(data[data["annee"].between(min(years),max(years))].index)]
+rapport["citationsP1"]=[len(data[data["annee"].between(min(periode1),max(periode1))].index)]
+rapport["citations rel P1"]=rapport["citationsP1"]/citationsP1
+rapport["citationsP2"]=[len(data[data["annee"].between(min(periode2),max(periode2))].index)]
+rapport["citations rel P2"]=rapport["citationsP2"]/citationsP2
+rapport["var citations"]=(rapport["citations rel P2"]/(rapport["citations rel P1"]))-1
+rapport.to_csv(path+"rapport.csv",index=False,decimal=",")
+
 """Champs a prevoir
 (id , nomf , noms ), occupation p1, occupation relat p1, occupation p2, occupation relat p2, var occupation, occurence p1, occurence p2, var occurence
 """
