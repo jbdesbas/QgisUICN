@@ -19,6 +19,7 @@ output=pd.DataFrame()
 output["debut"]=""
 output["fin"]=""
 output["occup"]=""
+output["citations"]=""
 
 for file in os.listdir(path):
 	if file.endswith('.shp') and file.startswith("espace_"):
@@ -40,9 +41,10 @@ for debut in range(annee_min,annee_max+1-4):
 		print str(debut)+" - "+str(fin)
 		data_centroid=gpd.GeoDataFrame(data[data["annee"].between(debut,fin)].copy()) #On ne prend que les centroid des data qui entre dans la periode
 		data_centroid['geometry']=data['geometry'].centroid
+		count=len(data_centroid.index)
 		occup=sjoin(maillage[['ID','geometry']],data_centroid[['geometry']])
 		occup=occup.drop_duplicates(['geometry']) #On vire les doublons
-		line=pd.DataFrame({'debut':debut,'fin':fin,'occup':occup.area.sum()/1000000},index=[0])
+		line=pd.DataFrame({'debut':debut,'fin':fin,'occup':occup.area.sum()/1000000,'citations':count},index=[0])
 		output=output.append(line,ignore_index=True)
 
 output.to_csv(path+"data_grp.csv",index=False)
