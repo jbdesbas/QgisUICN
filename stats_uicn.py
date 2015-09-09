@@ -14,15 +14,13 @@ else:
 	years=range(argv[1],argv[2]+1)
 	print "Periode "+str(argv[1])+" - "+str(argv[2])
 
-path='/home/jb/Code/python/UICN/V2/'
-maillage=gpd.GeoDataFrame.from_file('/home/jb/Code/python/UICN/V2/grille/2km_Picardie.shp')
+path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Conocephalus fuscus/'
+#maillage=gpd.GeoDataFrame.from_file('/home/jb/Code/python/UICN/V2/grille/2km_Picardie.shp')
+maillage=gpd.GeoDataFrame.from_file('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/grilles/2km_Picardie.shp')
 lamb93={u'lon_0': 3, 'wktext': True, u'ellps': u'GRS80', u'y_0': 6600000, u'no_defs': True, u'proj': u'lcc', u'x_0': 700000, u'units': u'm', u'lat_2': 44, u'lat_1': 49, u'lat_0': 46.5}
 #Aller ensuite prendre les data dans data_groupe.csv
-nbre_maillesP1=5171
-nbre_maillesP2=5171
 
-listData=[]
-shapes=[]
+data_grpe=pd.read_csv('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/data_grp.csv')
 
 def occurence(col): #colone pour regrouper donnes
 	mcps=gpd.GeoSeries(data.groupby(col)['geometry'].agg(shapely.ops.unary_union))
@@ -39,6 +37,9 @@ def occupation(col):  #colone pour regrouper donnes
 	occup=sjoin(maillage[['ID','geometry']],data_centroid[[col,'geometry']])
 	occup=occup.drop_duplicates(['geometry',col]) #On vire les doublons
 	return occup
+
+listData=[]
+shapes=[]
 
 for file in os.listdir(path):
 	if file.endswith('.shp') and file.startswith("espace_"):
@@ -65,6 +66,9 @@ data.loc[data["annee"].isin(periode1),'periode']='P1' #Categorise les obs sur le
 data.loc[data["annee"].isin(periode2),'periode']='P2'
 data.loc[data["annee"]<min(years),'periode']='Ant' #pour les anterierus
 data.loc[data["annee"]>max(years),'periode']='Post' #Trois pour les posterieur
+
+occupP1=data_grpe[data_grpe["debut"]==min(periode1)][data_grpe["fin"]==max(periode1)]["occup"].values[0] #Erreur ici si la periode nest pas dispo
+occupP2=data_grpe[data_grpe["debut"]==min(periode2)][data_grpe["fin"]==max(periode2)]["occup"].values[0] #Erreur ici si la periode
 
 ##### Zone d occurence #########
 #Un mcp par annee
@@ -126,14 +130,12 @@ stats_per["occup"]=pd.DataFrame(occup_per[occup_per["periode"].isin(['P1','P2'])
 mcp_per["mcp_area"]=mcp_per.area/1000000
 stats_per=pd.merge(stats_per,mcp_per[["periode","mcp_area"]], on="periode",how="left")
 
-
-
 #####Rapport
 rapport=pd.DataFrame()
 
-rapport["occupation"]=occup_ref.area.sum()/1000000
-rapport["occup rel P1"]=stats_per[stats_per["periode"]=='P1']['occup'].values/nbre_maillesP1
-rapport["occup rel P2"]=stats_per[stats_per["periode"]=='P2']['occup'].values/nbre_maillesP2
+rapport["occupation"]=[occup_ref.area.sum()/1000000]
+rapport["occup rel P1"]=stats_per[stats_per["periode"]=='P1']['occup'].values/occupP1
+rapport["occup rel P2"]=stats_per[stats_per["periode"]=='P2']['occup'].values/occupP2
 rapport["var occup"]=(rapport["occup rel P2"]/(rapport["occup rel P1"]))-1
 if debug == True :
 	#Champs en option
