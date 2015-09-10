@@ -1,4 +1,5 @@
 #Ne marche que avec du lambert93 (a fixer peutetre plus tard)
+#A corriger : bug si manque occurence P1 ou P2 (utiliser un merge pour avoir NaN; comme pour occupation)
 #stats_uicn.py path debut fin
 import geopandas as gpd
 import pandas as pd
@@ -9,14 +10,14 @@ from sys import argv
 import numpy as np
 
 if len(argv)<4: #si on a pas donner le debut et fin de ref
-	years=range(2005,2015+1) #les 10 dernierse annes (ou periode de ref)
+	years=range(2006,2015+1) #les 10 dernierse annes (ou periode de ref)
 	print "Periode par defaut utilisee : 2006-2015"
 else:
 	years=range(argv[1],argv[2]+1)
 	print "Periode "+str(argv[2])+" - "+str(argv[3])
 
-#path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Calliptamus italicus/' #avec le / de la fin
-path=argv[1]
+path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Forficula auricularia/' #avec le / de la fin
+#path=argv[1]
 #maillage=gpd.GeoDataFrame.from_file('/home/jb/Code/python/UICN/V2/grille/2km_Picardie.shp')
 maillage=gpd.GeoDataFrame.from_file('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/grilles/2km_Picardie.shp')
 data_grpe=pd.read_csv('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/data_grp.csv')
