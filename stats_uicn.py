@@ -16,11 +16,11 @@ else:
 	years=range(argv[1],argv[2]+1)
 	print "Periode "+str(argv[2])+" - "+str(argv[3])
 
-path='/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/Forficula auricularia/' #avec le / de la fin
+path='/home/jb/Documents/ListesRouges/Evaluation/Araignees/donnees/Aculepeira ceropegia (Walckenaer 1802)/' #avec le / de la fin
 #path=argv[1]
 #maillage=gpd.GeoDataFrame.from_file('/home/jb/Code/python/UICN/V2/grille/2km_Picardie.shp')
-maillage=gpd.GeoDataFrame.from_file('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/grilles/2km_Picardie.shp')
-data_grpe=pd.read_csv('/home/users/jbdesbas/Documents/ListesRouges/Evaluation/Orthopteres/Donnees/data_grp.csv')
+maillage=gpd.GeoDataFrame.from_file('/home/jb/Documents/ListesRouges/Evaluation/grilles/2km_Picardie.shp')
+data_grpe=pd.read_csv('/home/jb/Documents/ListesRouges/Evaluation/Araignees/donnees/data_grp.csv')
 debut=False
 lamb93={u'lon_0': 3, 'wktext': True, u'ellps': u'GRS80', u'y_0': 6600000, u'no_defs': True, u'proj': u'lcc', u'x_0': 700000, u'units': u'm', u'lat_2': 44, u'lat_1': 49, u'lat_0': 46.5}
 
@@ -154,8 +154,8 @@ rapport["citations rel P2"]=rapport["citationsP2"]/citationsP2
 rapport["var citations"]=(rapport["citations rel P2"]/(rapport["citations rel P1"]))-1
 
 rapport["occurence"]=mcp_ref.area.values/1000000
-rapport["occurenceP1"]=mcp_per[mcp_per['periode']=='P1'].area.values/1000000
-rapport["occurenceP2"]=mcp_per[mcp_per['periode']=='P2'].area.values/1000000
+rapport["occurenceP1"]=stats_per[stats_per['periode']=='P1']["mcp_area"].values
+rapport["occurenceP2"]=stats_per[stats_per['periode']=='P2']["mcp_area"].values
 rapport["var occurence"]=(rapport["occurenceP2"]/(rapport["occurenceP1"]))-1
 
 rapport["occupation"]=[occup_ref.area.sum()/1000000]
