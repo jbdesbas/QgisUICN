@@ -106,7 +106,16 @@ def traitement_espece(path): #Sera execute pour chaque sp, retourne la ligne du 
 		rapport["occurP2"]=[occurP2.area.sum()/1000000]
 	else:
 		rapport["occurP2"]=[0]
-	
+	#Periode total
+	condition=np.logical_and(data["date_obs"].dt.year.isin(years), data.geometry.is_valid) #Array de boolean valide ET dans la periode
+	subdata=gpd.GeoDataFrame(data[condition])
+	if len(subdata) > 2: #pas de tableau vide sinon ca fait planter... Et un mcp sur moins de 2 donnees c est debile
+		occur=occurence(subdata)
+		occur.to_file(path+'/out/occurence.shp')
+		rapport["occur"]=[occur.area.sum()/1000000]
+	else:
+		rapport["occur"]=[0]
+
 	##### Zone d occupation #####
 	#Per 1
 	condition=np.logical_and(data["date_obs"].dt.year.isin(periode1),data.geometry.is_valid)#Array de boolean valide ET dans la periode
@@ -133,6 +142,18 @@ def traitement_espece(path): #Sera execute pour chaque sp, retourne la ligne du 
 		rapport["occupationP2"]=[occupP2.area.sum()/1000000]
 	else:
 		rapport["occupationP2"]=[0]
+	#Periode total
+	condition=np.logical_and(data["date_obs"].dt.year.isin(years),data.geometry.is_valid)#Array de boolean valide ET dans la periode
+	subdata=gpd.GeoDataFrame(data[condition])
+	if len(subdata) > 0: #pas de tableau vide sinon ca fait planter...
+		occup=occupation(subdata)
+		try:
+			occup.to_file(path+'/out/occupation.shp')
+		except ValueError:
+			print("shape vide ?")
+		rapport["occupation"]=[occup.area.sum()/1000000]
+	else:
+		rapport["occupation"]=[0]
 
 	#####Rapport
 
